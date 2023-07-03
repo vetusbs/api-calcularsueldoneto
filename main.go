@@ -26,8 +26,13 @@ func main() {
 
 	router := gin.Default()
 	router.POST("/netSalary", calculateNetSalaryFucntion)
+	router.GET("/", index)
 
 	router.Run("0.0.0.0:8080")
+}
+
+func index(c *gin.Context) {
+	c.Data(200, "application/json; charset=utf-8", []byte("Good to see you"))
 }
 
 func calculateNetSalaryFucntion(c *gin.Context) {
