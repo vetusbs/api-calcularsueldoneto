@@ -18,7 +18,7 @@ func main() {
 	router := gin.Default()
 	router.POST("/netSalary", calculateNetSalary)
 
-	router.Run("localhost:8080")
+	router.Run("0.0.0.0:8080")
 }
 
 func calculateNetSalary(c *gin.Context) {
