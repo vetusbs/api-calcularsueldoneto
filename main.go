@@ -2,6 +2,7 @@ package main
 
 import (
 	"calcularsueldoneto/application"
+	"calcularsueldoneto/repository"
 
 	"github.com/gin-gonic/gin"
 
@@ -14,14 +15,17 @@ type salaryResponse struct {
 
 type SalaryRequest struct {
 	GrossSalary float32 `json:"gross_salary"`
+	Region      string  `json:"region"`
+	Children    int     `json:"children"`
+	Babies      int     `json:"babies"`
 }
 
 var calculateNetSalary application.CalculateNetSalary
 
 func main() {
 	calculateNetSalary = application.CalculateNetSalary{
-		RegionRepository: application.RegionRepository{},
-		StateRepository:  application.StateRepository{},
+		RegionRepository: repository.NewRegionRepository(),
+		StateRepository:  repository.NewStateRepository(),
 	}
 
 	router := gin.Default()
@@ -46,7 +50,10 @@ func calculateNetSalaryFucntion(c *gin.Context) {
 	netSalary := calculateNetSalary.Execute(
 		application.CalculateNetSalaryInput{
 			GrossSalary: salaryRequest.GrossSalary,
-			Region:      "whatever"})
+			Region:      salaryRequest.Region,
+			Children:    salaryRequest.Children,
+			Babies:      salaryRequest.Babies,
+		})
 
 	montlySalary := netSalary / 12
 	c.IndentedJSON(http.StatusOK, salaryResponse{MonthlyPayroll: montlySalary})

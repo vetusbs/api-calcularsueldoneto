@@ -1,0 +1,13 @@
+spain:
+  - upTo: 12450
+    retention: 9.5
+  - upTo: 20200
+    retention: 12
+  - upTo: 35200
+    retention: 15
+  - upTo: 60000
+    retention: 18.5
+  - upTo: 300000
+    retention: 22.5
+  - upTo: 1000000
+    retention: 24.5 
