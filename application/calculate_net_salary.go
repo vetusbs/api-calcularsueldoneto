@@ -1,6 +1,7 @@
 package application
 
 import (
+	"calcularsueldoneto/models"
 	"calcularsueldoneto/repository"
 	"fmt"
 )
@@ -17,35 +18,56 @@ type CalculateNetSalaryInput struct {
 	Babies      int
 }
 
-func (c CalculateNetSalary) Execute(input CalculateNetSalaryInput) float32 {
+type CalculateNetSalaryOutput struct {
+	MonthlyNet          float32
+	YearlyNet           float32
+	TotalWithholdings   float32
+	TotalSocialSecurity float32
+	ExtraMonth          float32
+}
 
-	stateRetentions := []float32{}
-	regionRetentions := []float32{}
+func (c CalculateNetSalary) Execute(input CalculateNetSalaryInput) CalculateNetSalaryOutput {
 
 	stateRanges := c.StateRepository.GetRangesForState()
 	regionRanges := c.RegionRepository.GetRangesForRegion(input.Region)
 
-	baseSalary := (input.GrossSalary * 0.94) - calculateBonus(input)
+	bonus := calculateBonus(input)                                                // kids, parents and disabilities
+	workerSSWithholdings := calculateSocialSecurityWithHolding(input.GrossSalary) // Employee social security
+	taxBase := (input.GrossSalary * 0.94)                                         // base amount for taxes
 
-	for i := 0; i < len(stateRanges); i++ {
-		retentionRange := stateRanges[i]
+	bonusRetention := calculateRetentions(regionRanges, bonus)
+	fmt.Printf("retention bonus: %f \n", bonusRetention)
 
-		retention := retentionRange.RetentionOverSalary(baseSalary)
+	stateRetention := calculateRetentions(stateRanges, taxBase)
+	fmt.Printf("retention state: %f \n", stateRetention)
 
-		fmt.Printf("retention state: %f bucket %v\n", retention, retentionRange)
-		stateRetentions = append(stateRetentions, retention)
+	regionRetention := calculateRetentions(regionRanges, taxBase)
+	fmt.Printf("retention region: %f \n", regionRetention)
+
+	totalWithholdings := regionRetention + stateRetention - bonusRetention
+	netYear := taxBase - totalWithholdings
+	netMonth := netYear / 12
+	return CalculateNetSalaryOutput{
+		MonthlyNet:          netMonth,
+		YearlyNet:           netYear,
+		TotalWithholdings:   totalWithholdings,
+		TotalSocialSecurity: workerSSWithholdings,
+		ExtraMonth:          float32(0),
+	}
+}
+
+func calculateRetentions(retentionRanges []models.RetentionRange, input float32) float32 {
+	var totalRetentions []float32
+
+	for i := 0; i < len(retentionRanges); i++ {
+		retentionRange := retentionRanges[i]
+
+		retention := retentionRange.RetentionOverSalary(input)
+
+		totalRetentions = append(totalRetentions, retention)
 	}
 
-	for i := 0; i < len(regionRanges); i++ {
-		retentionRange := regionRanges[i]
-
-		retention := retentionRange.RetentionOverSalary(baseSalary)
-
-		fmt.Printf("retention region: %f bucket %v\n", retention, retentionRange)
-		regionRetentions = append(regionRetentions, retention)
-	}
-
-	return (input.GrossSalary * 0.94) - (sumArrayValues(stateRetentions) + sumArrayValues(regionRetentions))
+	return sumArrayValues(totalRetentions)
 }
 
 type Props struct {
@@ -62,6 +84,20 @@ func calculateBonus(input CalculateNetSalaryInput) float32 {
 	//disabilityBonus := calculateDisabilityBonus(props.disabilityPercentage)
 
 	return float32(BASE_BONUS) + float32(childrenBonus) + float32(babiesBonus)
+}
+
+const MIN_SOCIAL_SECURITY = float32(1260)
+const MAX_SOCIAL_SECURITY = float32(4495.50)
+const EMPLOYER_SS_WITHHOLDINGS = 4.7 + 1.55 + 0.1
+
+func calculateSocialSecurityWithHolding(grossSalary float32) float32 {
+	if grossSalary > MAX_SOCIAL_SECURITY*12 {
+		return MAX_SOCIAL_SECURITY * 12 * (EMPLOYER_SS_WITHHOLDINGS / 100)
+	} else if grossSalary < MIN_SOCIAL_SECURITY*12 {
+		return MIN_SOCIAL_SECURITY * 12 * EMPLOYER_SS_WITHHOLDINGS
+	} else {
+		return grossSalary * EMPLOYER_SS_WITHHOLDINGS
+	}
 }
 
 func calculateChildrenBonus(input CalculateNetSalaryInput) float32 {

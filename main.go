@@ -30,6 +30,7 @@ func main() {
 
 	router := gin.Default()
 	router.POST("/netSalary", calculateNetSalaryFucntion)
+	router.OPTIONS("/netSalary", options)
 	router.GET("/", index)
 
 	router.Run("0.0.0.0:8080")
@@ -37,6 +38,11 @@ func main() {
 
 func index(c *gin.Context) {
 	c.Data(200, "application/json; charset=utf-8", []byte("Good to see you"))
+}
+
+func options(c *gin.Context) {
+	c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+	c.Writer.Header().Set("Access-Control-Allow-Headers", "*")
 }
 
 func calculateNetSalaryFucntion(c *gin.Context) {
@@ -55,6 +61,8 @@ func calculateNetSalaryFucntion(c *gin.Context) {
 			Babies:      salaryRequest.Babies,
 		})
 
-	montlySalary := netSalary / 12
-	c.IndentedJSON(http.StatusOK, salaryResponse{MonthlyPayroll: montlySalary})
+	c.Writer.Header().Set("Content-Type", "application/json")
+	c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+	c.Writer.Header().Set("Access-Control-Allow-Headers", "*")
+	c.IndentedJSON(http.StatusOK, netSalary)
 }
