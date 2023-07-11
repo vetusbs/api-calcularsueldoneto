@@ -14,10 +14,11 @@ type salaryResponse struct {
 }
 
 type SalaryRequest struct {
-	GrossSalary float32 `json:"gross_salary"`
-	Region      string  `json:"region"`
-	Children    int     `json:"children"`
-	Babies      int     `json:"babies"`
+	GrossSalary      float32 `json:"gross_salary"`
+	Region           string  `json:"region"`
+	Children         int     `json:"children"`
+	Babies           int     `json:"babies"`
+	NumberOfPayslips int     `json:"number_of_payslips"`
 }
 
 var calculateNetSalary application.CalculateNetSalary
@@ -55,10 +56,11 @@ func calculateNetSalaryFucntion(c *gin.Context) {
 
 	netSalary := calculateNetSalary.Execute(
 		application.CalculateNetSalaryInput{
-			GrossSalary: salaryRequest.GrossSalary,
-			Region:      salaryRequest.Region,
-			Children:    salaryRequest.Children,
-			Babies:      salaryRequest.Babies,
+			GrossSalary:      salaryRequest.GrossSalary,
+			Region:           salaryRequest.Region,
+			Children:         salaryRequest.Children,
+			Babies:           salaryRequest.Babies,
+			NumberOfPayslips: salaryRequest.NumberOfPayslips,
 		})
 
 	c.Writer.Header().Set("Content-Type", "application/json")

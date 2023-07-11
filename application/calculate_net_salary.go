@@ -12,10 +12,11 @@ type CalculateNetSalary struct {
 }
 
 type CalculateNetSalaryInput struct {
-	GrossSalary float32
-	Region      string
-	Children    int
-	Babies      int
+	GrossSalary      float32
+	Region           string
+	Children         int
+	Babies           int
+	NumberOfPayslips int
 }
 
 type CalculateNetSalaryOutput struct {
@@ -24,6 +25,7 @@ type CalculateNetSalaryOutput struct {
 	TotalWithholdings   float32
 	TotalSocialSecurity float32
 	ExtraMonth          float32
+	IRPF                float32
 }
 
 func (c CalculateNetSalary) Execute(input CalculateNetSalaryInput) CalculateNetSalaryOutput {
@@ -31,12 +33,15 @@ func (c CalculateNetSalary) Execute(input CalculateNetSalaryInput) CalculateNetS
 	stateRanges := c.StateRepository.GetRangesForState()
 	regionRanges := c.RegionRepository.GetRangesForRegion(input.Region)
 
-	bonus := calculateBonus(input)                                                // kids, parents and disabilities
-	workerSSWithholdings := calculateSocialSecurityWithHolding(input.GrossSalary) // Employee social security
-	taxBase := (input.GrossSalary * 0.94)                                         // base amount for taxes
+	bonus := calculateBonus(input)                                               // kids, parents and disabilities
+	workerSSWithholding := calculateSocialSecurityWithHolding(input.GrossSalary) // Employee social security
+	taxBase := input.GrossSalary - workerSSWithholding - 2000                    // base amount for taxes
 
 	bonusRetention := calculateRetentions(regionRanges, bonus)
-	fmt.Printf("retention bonus: %f \n", bonusRetention)
+	fmt.Printf("retention region bonus: %f \n", bonusRetention)
+
+	bonusRetention = bonusRetention + calculateRetentions(stateRanges, bonus)
+	fmt.Printf("retention state bonus: %f \n", bonusRetention)
 
 	stateRetention := calculateRetentions(stateRanges, taxBase)
 	fmt.Printf("retention state: %f \n", stateRetention)
@@ -44,15 +49,32 @@ func (c CalculateNetSalary) Execute(input CalculateNetSalaryInput) CalculateNetS
 	regionRetention := calculateRetentions(regionRanges, taxBase)
 	fmt.Printf("retention region: %f \n", regionRetention)
 
-	totalWithholdings := regionRetention + stateRetention - bonusRetention
-	netYear := taxBase - totalWithholdings
-	netMonth := netYear / 12
+	irpfWithholding := regionRetention + stateRetention
+	irpfWithholdingPercentage := irpfWithholding / taxBase
+
+	totalWithholding := regionRetention + stateRetention - bonusRetention
+	// totalWithholdingPercentage := totalWithholding / input.GrossSalary
+
+	var netYear float32
+	var netMonth float32
+	var extraMonth float32 = 0.0
+
+	if input.NumberOfPayslips == 12 {
+		netYear = input.GrossSalary - workerSSWithholding - totalWithholding
+		netMonth = netYear / 12
+	} else {
+		netYear = input.GrossSalary - workerSSWithholding - totalWithholding
+		netMonth = (netYear / 14) - (workerSSWithholding * 1 / 72)
+		extraMonth = (netYear / 14) + (workerSSWithholding * 1 / 12)
+	}
+
 	return CalculateNetSalaryOutput{
 		MonthlyNet:          netMonth,
 		YearlyNet:           netYear,
-		TotalWithholdings:   totalWithholdings,
-		TotalSocialSecurity: workerSSWithholdings,
-		ExtraMonth:          float32(0),
+		TotalWithholdings:   totalWithholding,
+		TotalSocialSecurity: workerSSWithholding,
+		ExtraMonth:          extraMonth,
+		IRPF:                irpfWithholdingPercentage,
 	}
 }
 
@@ -88,11 +110,11 @@ func calculateBonus(input CalculateNetSalaryInput) float32 {
 
 const MIN_SOCIAL_SECURITY = float32(1260)
 const MAX_SOCIAL_SECURITY = float32(4495.50)
-const EMPLOYER_SS_WITHHOLDINGS = 4.7 + 1.55 + 0.1
+const EMPLOYER_SS_WITHHOLDINGS = (4.7 + 1.55 + 0.1) / 100
 
 func calculateSocialSecurityWithHolding(grossSalary float32) float32 {
 	if grossSalary > MAX_SOCIAL_SECURITY*12 {
-		return MAX_SOCIAL_SECURITY * 12 * (EMPLOYER_SS_WITHHOLDINGS / 100)
+		return MAX_SOCIAL_SECURITY * 12 * EMPLOYER_SS_WITHHOLDINGS
 	} else if grossSalary < MIN_SOCIAL_SECURITY*12 {
 		return MIN_SOCIAL_SECURITY * 12 * EMPLOYER_SS_WITHHOLDINGS
 	} else {
@@ -103,17 +125,17 @@ func calculateSocialSecurityWithHolding(grossSalary float32) float32 {
 func calculateChildrenBonus(input CalculateNetSalaryInput) float32 {
 	switch input.Children {
 	case 0:
-		return 2400
+		return 0
 	case 1:
 		return 2400
 	case 2:
-		return 2700
+		return 2700 + 2400
 	case 3:
-		return 4000
+		return 4000 + 2700 + 2400
 	case 4:
-		return 4500
+		return 4500 + 4000 + 2700 + 2400
 	default:
-		return 4500
+		return 4500 + 4500 + 4000 + 2700 + 2400
 	}
 }
 
